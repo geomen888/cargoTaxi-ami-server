@@ -3,6 +3,7 @@ const HAPI          = require("@hapi/hapi")
 const HAPIAuthBasic = require("@hapi/basic")
 const HAPIWebSocket = require("hapi-plugin-websocket")
 const WSS           = require("ws");
+const jwt           = require('jsonwebtoken');
 
 (async () => {
     /*  create new HAPI service  */
@@ -14,15 +15,19 @@ const WSS           = require("ws");
 
     /*  register Basic authentication stategy  */
     server.auth.strategy("basic", "basic", {
-        validate: async (request, username, password, h) => {
-          console.log("validate:username:", username);
-          console.log("validate:password:", password);
-
+        allowEmptyUsername: true,
+        validate: async (request, _, token, h) => {
+            console.log("token:", token);
             let isValid     = false
             let credentials = null
-            if (username === "foo" && password === "bar") {
-                isValid = true
-                credentials = { username }
+
+            if (token) {
+                const decoded = await jwt.verify(token, "your-256-bit-secret");
+                if (decoded.sub === "user1") {
+                    isValid = true;
+                    credentials = { ...decoded }
+                }
+                
             }
             return { isValid, credentials }
         }
