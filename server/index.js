@@ -17,7 +17,7 @@ const jwt           = require('jsonwebtoken');
     server.auth.strategy("basic", "basic", {
         allowEmptyUsername: true,
         validate: async (request, _, token, h) => {
-            console.log("token:", token);
+            // console.log("token:", token);
             let isValid     = false
             let credentials = null
 
