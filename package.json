@@ -1,5 +1,5 @@
 {
-  "name": "express-server",
+  "name": "asterisk-ami-server",
   "version": "0.1.0",
   "description": "",
   "main": "server/index.js",
@@ -17,6 +17,7 @@
     "asterisk-ami-client": "^1.1.5",
     "express": "^4.16.3",
     "hapi-plugin-websocket": "^2.3.2",
+    "jsonwebtoken": "^8.5.1",
     "websocket-framed": "^1.2.4",
     "ws": "^7.4.2"
   }

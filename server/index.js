@@ -3,11 +3,19 @@ const HAPI          = require("@hapi/hapi")
 const HAPIAuthBasic = require("@hapi/basic")
 const HAPIWebSocket = require("hapi-plugin-websocket")
 const WSS           = require("ws");
-const jwt           = require('jsonwebtoken');
+const jwt           = require("jsonwebtoken");
+const AmiClient     = require("asterisk-ami-client");
+
 
 (async () => {
     /*  create new HAPI service  */
-    const server = new HAPI.Server({ address: "127.0.0.1", port: 3000 })
+    const server = new HAPI.Server({ address: "127.0.0.1", port: 3000 });
+    const wss = new WSS('wss://1672wkkz50.execute-api.eu-central-1.amazonaws.com/dev', {
+        headers : {
+            "X-Amz-Security-Token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImRhdGEiOiJTZW1lbiIsImlhdCI6MTUxNjIzOTAyMiwiSUQiOiIyNjQ4ZjY3My03MDA4LTQyMWEtYTg5NC04NWJlYjVlYTg4MzMifQ.XE3fFttmpNUbenTcGl4bj66-PLRRlgS7OnNR46CRKmc",
+          }
+        });
+    let client = new AmiClient();
 
     /*  register HAPI plugins  */
     await server.register(HAPIWebSocket)
@@ -32,6 +40,41 @@ const jwt           = require('jsonwebtoken');
             return { isValid, credentials }
         }
     });
+
+
+
+    wss.on('open', function open() {
+        console.log('connected');
+    
+       // const msg = JSON.stringify({ action: 'coordinates',  "coordinates": [125.6, 10.1] }) 
+       const msg = JSON.stringify({ action: 'message', message: "Hello" }) // clientId: '110ec58a-a0f2-4ac4-8393-c866d813b8d1'   
+    
+        wss.send(msg);
+
+        client.connect('ami-manager', 'sUpeRseCret', { host: 'localhost', port: 5038 })
+    .then(amiConnection => {
+
+        client
+            .on('connect', () => console.log('connect -- ami'))
+            .on('event', event => console.log(event))
+            .on('data', chunk => console.log(chunk))
+            .on('response', response => console.log(response))
+            .on('disconnect', () => console.log('disconnect'))
+            .on('reconnection', () => console.log('reconnection'))
+            .on('internalError', error => console.log(error))
+            .action({
+                Action: 'Ping'
+            });
+
+        }).catch(error => console.log("error:ami-client:", error));
+
+    });
+
+    wss.on('message', function incoming(message) {
+        console.log('received:message: %s', message);
+      });
+
+
 
     /*  provide plain REST route  */
     server.route({
