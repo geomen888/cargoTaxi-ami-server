@@ -10,8 +10,8 @@ const AmiClient     = require("asterisk-ami-client");
 (async () => {
     /*  create new HAPI service  */
     const server = new HAPI.Server({ address: "127.0.0.1", port: 3000 });
-    const wss = new WSS('wss://1672wkkz50.execute-api.eu-central-1.amazonaws.com/dev', {
-        headers : {
+    const wss = new WSS('wss://1672wkkz50.execute-api.eu-central-1.amazonaws.com/dev', 'ami-1.0',  {
+        headers: {
             "X-Amz-Security-Token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImRhdGEiOiJTZW1lbiIsImlhdCI6MTUxNjIzOTAyMiwiSUQiOiIyNjQ4ZjY3My03MDA4LTQyMWEtYTg5NC04NWJlYjVlYTg4MzMifQ.XE3fFttmpNUbenTcGl4bj66-PLRRlgS7OnNR46CRKmc",
           }
         });
@@ -25,7 +25,7 @@ const AmiClient     = require("asterisk-ami-client");
     server.auth.strategy("basic", "basic", {
         allowEmptyUsername: true,
         validate: async (request, _, token, h) => {
-            // console.log("token:", token);
+            console.log("request:", request);
             let isValid     = false
             let credentials = null
 
@@ -48,7 +48,6 @@ const AmiClient     = require("asterisk-ami-client");
     
        // const msg = JSON.stringify({ action: 'coordinates',  "coordinates": [125.6, 10.1] }) 
        const msg = JSON.stringify({ action: 'message', message: "Hello" }) // clientId: '110ec58a-a0f2-4ac4-8393-c866d813b8d1'   
-    
         wss.send(msg);
 
         client.connect('ami-manager', 'sUpeRseCret', { host: 'localhost', port: 5038 })
@@ -58,7 +57,7 @@ const AmiClient     = require("asterisk-ami-client");
             .on('connect', () => console.log('connect -- ami'))
             .on('event', event => console.log(event))
             .on('data', chunk => console.log(chunk))
-            .on('response', response => console.log(response))
+            .on('response', response => console.log("responce-ami:", response))
             .on('disconnect', () => console.log('disconnect'))
             .on('reconnection', () => console.log('reconnection'))
             .on('internalError', error => console.log(error))
@@ -88,17 +87,18 @@ const AmiClient     = require("asterisk-ami-client");
   })
 
     server.route({
-        method: "POST", path: "/quux",
+        method: "POST", path: "/dev",
         config: {
             response: { emptyStatusCode: 204 },
             payload: { output: "data", parse: true, allow: "application/json" },
-            auth: { mode: "required", strategy: "basic" },
+            // auth: { mode: "required", strategy: "basic" },
             plugins: {
                 websocket: {
                     only: true,
                     initially: true,
-                    subprotocol: "quux/1.0",
+                    // subprotocol: "quux/1.0",
                     connect: ({ ctx, ws } ) => {
+                        console.log("connect:ws:", ws);
                         ctx.to = setInterval(() => {
                             if (ws.readyState === WSS.OPEN)
                                 ws.send(JSON.stringify({ cmd: "PING" }))
