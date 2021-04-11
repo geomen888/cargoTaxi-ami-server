@@ -1,20 +1,17 @@
-const Boom          = require("@hapi/boom")
-const HAPI          = require("@hapi/hapi")
+const Boom = require("@hapi/boom")
+const HAPI = require("@hapi/hapi")
 const HAPIAuthBasic = require("@hapi/basic")
 const HAPIWebSocket = require("hapi-plugin-websocket")
-const WSS           = require("ws");
-const jwt           = require("jsonwebtoken");
-const AmiClient     = require("asterisk-ami-client");
+const WSS = require("ws");
+const url = require("url");
+const jwt = require("jsonwebtoken");
+const AmiClient = require("asterisk-ami-client");
 
 
 (async () => {
     /*  create new HAPI service  */
-    const server = new HAPI.Server({ address: "127.0.0.1", port: 3000 });
-    const wss = new WSS('wss://1672wkkz50.execute-api.eu-central-1.amazonaws.com/dev', 'ami-1.0',  {
-        headers: {
-            "X-Amz-Security-Token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImRhdGEiOiJTZW1lbiIsImlhdCI6MTUxNjIzOTAyMiwiSUQiOiIyNjQ4ZjY3My03MDA4LTQyMWEtYTg5NC04NWJlYjVlYTg4MzMifQ.XE3fFttmpNUbenTcGl4bj66-PLRRlgS7OnNR46CRKmc",
-          }
-        });
+    const server = new HAPI.Server({ address: "127.0.0.1", port: 5000 });
+    let wss = null;
     let client = new AmiClient();
 
     /*  register HAPI plugins  */
@@ -26,7 +23,7 @@ const AmiClient     = require("asterisk-ami-client");
         allowEmptyUsername: true,
         validate: async (request, _, token, h) => {
             console.log("request:", request);
-            let isValid     = false
+            let isValid = false
             let credentials = null
 
             if (token) {
@@ -35,56 +32,90 @@ const AmiClient     = require("asterisk-ami-client");
                     isValid = true;
                     credentials = { ...decoded }
                 }
-                
+
             }
             return { isValid, credentials }
         }
     });
 
-
-
-    wss.on('open', function open() {
-        console.log('connected');
+    function IsJsonString(str) {
+        try {
+          var json = JSON.parse(str);
+          return (typeof json === 'object');
+        } catch (e) {
+          return false;
+        }
+      }
+    const connect = () => {
+        wss = new WSS('wss://1672wkkz50.execute-api.eu-central-1.amazonaws.com/dev', 'ami-1.0', {
+            headers: {
+                "X-Amz-Security-Token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImRhdGEiOiJTZW1lbiIsImlhdCI6MTUxNjIzOTAyMiwiSUQiOiIyNjQ4ZjY3My03MDA4LTQyMWEtYTg5NC04NWJlYjVlYTg4MzMifQ.XE3fFttmpNUbenTcGl4bj66-PLRRlgS7OnNR46CRKmc",
+            }
+        });
+        
+        wss.on('open', function open() {
+            console.log('connected');
     
-       // const msg = JSON.stringify({ action: 'coordinates',  "coordinates": [125.6, 10.1] }) 
-       const msg = JSON.stringify({ action: 'message', message: "Hello" }) // clientId: '110ec58a-a0f2-4ac4-8393-c866d813b8d1'   
-        wss.send(msg);
+            // const msg = JSON.stringify({ action: 'coordinates',  "coordinates": [125.6, 10.1] }) 
+            const msg = JSON.stringify({ action: 'message', message: "Hello" }) // clientId: '110ec58a-a0f2-4ac4-8393-c866d813b8d1'   
+            wss.send(msg);
+    
+            client.connect('ami-manager', 'sUpeRseCret', { host: 'localhost', port: 5038 })
+                .then(amiConnection => {
+    
+                    client
+                        .on('connect', () => console.log('connect -- ami'))
+                        .on('event', event => console.log(event))
+                        .on('data', chunk => console.log(chunk))
+                        .on('response', response => console.log("responce-ami:", response))
+                        .on('disconnect', () => console.log('disconnect'))
+                        .on('reconnection', () => console.log('reconnection'))
+                        .on('internalError', error => console.log(error))
+                        .action({
+                            Action: 'Ping'
+                        });
+    
+                }).catch(error => console.log("error:ami-client:", error));
+    
+                wss.on('message', function incoming(message) {
+                    console.log('received:message: %s', message);
+                    if (IsJsonString(message)) {
+                        const { originatePayload } = JSON.parse(message);
+                        client.action(originatePayload, (err, done) => {
+                            if (err) {
+                                console.error('actions:originate:', err)
+                            }
+                        })
+                    }
+                    
+                });    
+        });
+        wss.on('onclose', function onclose(e) {
+            console.log('Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
+            setTimeout(function() {
+              connect();
+            }, 1000);
+        });
 
-        client.connect('ami-manager', 'sUpeRseCret', { host: 'localhost', port: 5038 })
-    .then(amiConnection => {
 
-        client
-            .on('connect', () => console.log('connect -- ami'))
-            .on('event', event => console.log(event))
-            .on('data', chunk => console.log(chunk))
-            .on('response', response => console.log("responce-ami:", response))
-            .on('disconnect', () => console.log('disconnect'))
-            .on('reconnection', () => console.log('reconnection'))
-            .on('internalError', error => console.log(error))
-            .action({
-                Action: 'Ping'
-            });
+        wss.on('onerror', function(err) {
+            console.error('Socket encountered error: ', err.message, 'Closing socket');
+            ws.close();
+        });
+    }
 
-        }).catch(error => console.log("error:ami-client:", error));
-
-    });
-
-    wss.on('message', function incoming(message) {
-        console.log('received:message: %s', message);
-      });
-
-
+    connect();
 
     /*  provide plain REST route  */
     server.route({
-      method: "POST", path: "/foo",
-      config: {
-          payload: { output: "data", parse: true, allow: "application/json" }
-      },
-      handler: (request, h) => {
-          return { at: "foo", seen: request.payload }
-      }
-  })
+        method: "POST", path: "/foo",
+        config: {
+            payload: { output: "data", parse: true, allow: "application/json" }
+        },
+        handler: (request, h) => {
+            return { at: "foo", seen: request.payload }
+        }
+    })
 
     server.route({
         method: "POST", path: "/dev",
@@ -97,8 +128,8 @@ const AmiClient     = require("asterisk-ami-client");
                     only: true,
                     initially: true,
                     // subprotocol: "quux/1.0",
-                    connect: ({ ctx, ws } ) => {
-                        console.log("connect:ws:", ws);
+                    connect: ({ ctx, ws }) => {
+                        console.log("connect:WSS:", ws);
                         ctx.to = setInterval(() => {
                             if (ws.readyState === WSS.OPEN)
                                 ws.send(JSON.stringify({ cmd: "PING" }))
@@ -141,9 +172,9 @@ const AmiClient     = require("asterisk-ami-client");
     console.log('Server running on %s', server.info.uri);
 
 })()
-.catch((err) => {
-    console.log(`ERROR: ${err}`)
-})
+    .catch((err) => {
+        console.log(`ERROR: ${err}`)
+    })
 
 // const express = require('express')
 // const Stream = require('./sse');
