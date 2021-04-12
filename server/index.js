@@ -81,9 +81,10 @@ const AmiClient = require("asterisk-ami-client");
                     console.log('received:message: %s', message);
                     if (IsJsonString(message)) {
                         const { originatePayload } = JSON.parse(message);
-                        client.action(originatePayload, (err, done) => {
+                        client.action({ ...originatePayload, priority: 1 }, (err, done) => {
                             if (err) {
                                 console.error('actions:originate:', err)
+                                return;
                             }
                         })
                     }
