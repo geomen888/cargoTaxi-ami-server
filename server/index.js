@@ -101,11 +101,11 @@ const AmiClient = require("asterisk-ami-client");
 
         wss.on('onerror', function(err) {
             console.error('Socket encountered error: ', err.message, 'Closing socket');
-            ws.close();
+            wss.close();
         });
     }
 
-    connect();
+    // connect();
 
     /*  provide plain REST route  */
     server.route({
